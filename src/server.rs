@@ -5,6 +5,12 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
+enum RequestError {
+    Internal,
+    MethodNotAllowed,
+    BadRequest,
+}
+
 pub struct HttpServer {
     headers: Vec<Header>,
     prefix: String,
@@ -33,19 +39,29 @@ impl HttpServer {
                             let req = self.get_req_data(&stream);
                             let ip = stream.peer_addr().unwrap().ip();
 
-                            if let Err(e) = req {
-                                println!("Request from {}:\n{}", ip, e);
-                                res.status(500)
-                                    .message("Internal server error")
-                                    .send(e.to_string());
-                                return;
+                            match req {
+                                Ok(req) => {
+                                    println!("[{}] {} {}", ip, req.0, req.1);
+
+                                    self.handle_request(req, res);
+                                }
+                                Err(e) => {
+                                    let body = String::new();
+                                    match e {
+                                        RequestError::MethodNotAllowed => {
+                                            res.status(405).message("Method not allowed").send(body)
+                                        }
+                                        RequestError::BadRequest => {
+                                            res.status(400).message("BadRequest").send(body)
+                                        }
+
+                                        RequestError::Internal => res
+                                            .status(500)
+                                            .message("Internal server error")
+                                            .send(body),
+                                    }
+                                }
                             }
-
-                            let req = req.unwrap();
-
-                            println!("[{}] {} {}", ip, req.0, req.1);
-
-                            self.handle_request(req, res);
                         }
                         Err(e) => eprintln!("Error: {}", e),
                     };
@@ -58,15 +74,24 @@ impl HttpServer {
         }
     }
 
-    fn get_req_data(&self, mut stream: &TcpStream) -> Result<(String, String), String> {
+    fn get_req_data(&self, mut stream: &TcpStream) -> Result<(String, String), RequestError> {
         let mut buffer = [0; 1000];
 
         if let Err(e) = stream.read(&mut buffer) {
-            return Err(format!("Failed to process request.\nError:\n{}", e));
+            eprintln!("Failed to process request.\nError:\n{}", e);
+            return Err(RequestError::Internal);
         }
 
         let req_str = String::from_utf8(buffer.to_vec()).unwrap();
+        if !req_str.starts_with("GET") {
+            return Err(RequestError::MethodNotAllowed);
+        }
+
         let req: Vec<&str> = req_str.split_whitespace().collect();
+
+        if req.len() < 2 {
+            return Err(RequestError::BadRequest);
+        }
         let method = req[0];
         let url = req[1];
 
