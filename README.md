@@ -1,3 +1,5 @@
+<img src="./assets/screenshot.png">
+
 # Rust WebServer
 
 **Rust WebServer** is a simple static files http server. It allows you to configure it via `config.yml` file.

@@ -15,6 +15,7 @@ const BANNER: &'static str = r#"
 "#;
 
 fn panic_hook(info: &PanicInfo<'_>) {
+    println!("{}", info);
     let msg = match info.payload().downcast_ref::<&'static str>() {
         Some(s) => *s,
         None => match info.payload().downcast_ref::<String>() {
