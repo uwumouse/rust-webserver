@@ -1,0 +1,8 @@
+server:
+  port: 8080 # A port where the server will start
+  # Notice that none of these have an ending slash 
+  prefix: "/static"
+  path: "./files"
+  headers:
+    - Access-Control-Allow-Origin: "*"
+    - Content-Type: "text/html"
