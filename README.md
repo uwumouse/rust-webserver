@@ -17,10 +17,15 @@ See a `config.example.yml` as a reference, it's pretty straight forward.
 
 ## Running
 
-I assume you've already built it with `cargo build`:
+First of all, you need to build it:
 
 ```bash
-./target/webserver ./config.yml
-# Or you can try to run it with default config
-./target/webserver ./config.example.yml
+cargo build --release
+cp ./target/release/webserver .
+```
+
+And then run it (assuming you have a config file in current directory):
+
+```bash
+./webserver config.example.yml
 ```
