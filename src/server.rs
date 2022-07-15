@@ -48,17 +48,19 @@ impl HttpServer {
                                 Err(e) => {
                                     let body = String::new();
                                     match e {
-                                        RequestError::MethodNotAllowed => {
-                                            res.status(405).message("Method not allowed").send(body)
-                                        }
-                                        RequestError::BadRequest => {
-                                            res.status(400).message("BadRequest").send(body)
-                                        }
+                                        RequestError::MethodNotAllowed => res
+                                            .status(405)
+                                            .message("Method not allowed")
+                                            .send_from_str(body, None),
+                                        RequestError::BadRequest => res
+                                            .status(400)
+                                            .message("BadRequest")
+                                            .send_from_str(body, None),
 
                                         RequestError::Internal => res
                                             .status(500)
                                             .message("Internal server error")
-                                            .send(body),
+                                            .send_from_str(body, None),
                                     }
                                 }
                             }
@@ -101,24 +103,35 @@ impl HttpServer {
     fn send_not_found(&self, res: HttpResponse) {
         res.status(404)
             .message("Not found")
-            .send("Resource not found".to_string())
+            .send_from_str("Resource not found".to_string(), None)
     }
 
     fn handle_request(&self, req: (String, String), mut res: HttpResponse) {
         let mut path = req.1;
         // Replace prefix with the actual path (if present at the start of the string)
         if path.starts_with(&self.prefix) {
-            path = path.replace(&self.prefix, &self.path);
+            path = path.replacen(&self.prefix, &self.path, 1);
         }
 
-        return match fs::read_to_string(path) {
-            Ok(contents) => res.send(contents),
+        return match fs::read(&path) {
+            Ok(contents) => {
+                let mime = mime_guess::from_path(path);
+                res.send_bytes(
+                    contents,
+                    Some(vec![(
+                        "Content-Type".to_string(),
+                        mime.first_or_text_plain().to_string(),
+                    )]),
+                );
+            }
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => self.send_not_found(res),
-                _ => res
-                    .status(500)
-                    .message("Internal server error.")
-                    .send("Failed to process the request.".to_string()),
+                e => {
+                    res.status(500)
+                        .message("Internal server error.")
+                        .send_from_str("Failed to process the request.".to_string(), None);
+                    println!("{e:#?}");
+                }
             },
         };
     }

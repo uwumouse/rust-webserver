@@ -34,22 +34,40 @@ impl<'a> HttpResponse<'a> {
         self
     }
 
-    fn build(&self, body: String) -> String {
-        let mut res = format!("HTTP/1.1 {} {}\n", self.status, self.message);
+    fn build_response(
+        &self,
+        mut body: Vec<u8>,
+        additional_headers: Option<Vec<(String, String)>>,
+    ) -> Vec<u8> {
+        let mut res = format!("HTTP/1.1 {} {}\n", self.status, self.message)
+            .as_bytes()
+            .to_vec();
 
-        for h in &self.headers {
-            res.push_str(&format!("{}: {}\n", h.0, h.1));
+        HttpResponse::append_headers(&mut res, &self.headers);
+        if let Some(h) = additional_headers {
+            HttpResponse::append_headers(&mut res, &h);
         }
 
-        res.push_str(&format!("\n{}", body));
+        res.append(&mut "\n".as_bytes().to_vec());
+        res.append(&mut body);
 
         res
     }
 
-    pub fn send(&mut self, body: String) {
-        let res = self.build(body);
+    fn append_headers(res: &mut Vec<u8>, headers: &Vec<(String, String)>) {
+        for h in headers {
+            res.append(&mut format!("{}: {}\n", h.0, h.1).as_bytes().to_vec());
+        }
+    }
 
-        self.stream.write_all(res.as_bytes()).unwrap();
+    pub fn send_from_str(&mut self, body: String, headers: Option<Vec<(String, String)>>) {
+        self.send_bytes(body.as_bytes().to_vec(), headers);
+    }
+
+    pub fn send_bytes(&mut self, body: Vec<u8>, headers: Option<Vec<(String, String)>>) {
+        let res = self.build_response(body, headers);
+
+        self.stream.write_all(&res).unwrap();
         self.stream.flush().unwrap();
     }
 }
